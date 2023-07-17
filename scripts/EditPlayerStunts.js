@@ -164,15 +164,27 @@ class EditPlayerStunts extends FormApplication {
             if (this.actor.token.id == id){
                let name = this.stunt.name;
                 try {
-                    if (data.actorData.system.stunts[name]!=undefined){
+                    let check = false;
+                    if (isNewerVersion(game.version, "11.293")){
+                        if (data.delta.system.stunts[name]!=undefined) check = true;
+                    }
+                    else {
+                        if (data.actorData.system.stunts[name]!=undefined) check = true;
+                    }
+                    if (check){
                         if (!this.renderPending) {
                             this.renderPending = true;
                             setTimeout(() => {
-                                this.stunt = mergeObject(this.stunt, data.actorData.system.stunts[name]);
+                                if (isNewerVersion(game.version, "11.293")){
+                                    this.stunt = mergeObject(this.stunt, data.delta.system.stunts[name]);
+                                }
+                                else {
+                                    this.stunt = mergeObject(this.stunt, data.actorData.system.stunts[name]);
+                                }
                                 ui.notifications.info(game.i18n.localize("fate-core-official.StuntEdited"))
                                 this.render(false);
                                 this.renderPending = false;
-                            }, 150);
+                            }, 50);
                         }
                     }
                 }
@@ -193,7 +205,7 @@ class EditPlayerStunts extends FormApplication {
                                 ui.notifications.info(game.i18n.localize("fate-core-official.StuntEdited"))
                                 this.render(false);
                                 this.renderPending = false;
-                            }, 150);
+                            }, 50);
                         }
                     }
                 }
@@ -490,7 +502,7 @@ class StuntDB extends Application {
     }
 
     async _onAddButton(event, html){
-        let stunt = game.settings.get("fate-core-official","stunts")[event.target.id.split("_")[0]];
+        let stunt = duplicate(game.settings.get("fate-core-official","stunts")[event.target.id.split("_")[0]]);
         this.actor.update({"system.stunts":{[`${stunt.name}`]:stunt}});
     }
 

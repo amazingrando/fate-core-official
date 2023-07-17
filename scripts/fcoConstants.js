@@ -1,6 +1,6 @@
 class fcoConstants { 
 
-    static getFateLadder(){
+    getFateLadder(){
         return  {
                     "10":"",
                     "9":"",
@@ -25,7 +25,7 @@ class fcoConstants {
         return DOMPurify.sanitize(await TextEditor.enrichHTML(value, {secrets:secrets, documents:true, async:true}));
     }
 
-    static getAdjective(r){
+    getAdjective(r){
         const ladder = this.getFateLadder()
         return (ladder[r])
     }
@@ -359,7 +359,6 @@ class fcoConstants {
 
         let current_defaults = game.settings.get("fate-core-official", "defaults");
         let defaults = input?.defaults;
-        console.log(defaults);
 
         // Give option to merge stunts, if there are stunts in the new settings AND stunts in the existing settings.
 

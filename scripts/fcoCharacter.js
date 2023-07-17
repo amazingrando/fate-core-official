@@ -87,6 +87,11 @@ export class fcoCharacter extends ActorSheet {
             this.render(false);
         })
 
+        const override_world = html.find(`input[name="${this.object._id}_override"]`);
+        override_world.on("change", async event => {
+            await this.object.update({"system.override.active":event.target.checked});
+        })
+
         const expandTrack = html.find("i[name='expandTrack']");
 
         expandTrack.on("click", event => {
@@ -115,6 +120,18 @@ export class fcoCharacter extends ActorSheet {
             this.render(false);
         })
 
+        const syncToken =html.find("i[name='syncNameToToken']");
+        syncToken.on("click", async event => {
+            if (this.actor.isToken){
+                // Change token name
+                await this.actor.token.update({"name":this.actor.name});
+                ui.notifications.info("Token name set to token actor's name.")
+            } else {
+                //Change protype token name
+                await this.actor.update({"prototypeToken.name":this.actor.name});
+                ui.notifications.info("Prototype Token name set to actor's name.")
+            }
+        })
 
         const expandStunt = html.find("i[name='expandStunt']");
 
@@ -1018,6 +1035,43 @@ export class fcoCharacter extends ActorSheet {
 
     async _on_item_drag (event, html){
         let item = await fromUuid(event.currentTarget.getAttribute("data-item"));
+        if (item?.parent){
+            // Store the status of stress tracks on the parent back to the extra if this extra is being dragged from a character.
+            let trackUpdates = duplicate(item.system.tracks);
+            let tracks = item?.parent?.system?.tracks;
+
+            for (let t in trackUpdates){
+                // Need to grab the original name from the ACTOR, not from the extra. So we need to reverse the order of operations here
+                // to search through the actor's tracks to find one with an original name that matches this track.
+                for (let at in tracks){
+                    let name = tracks[at]?.original_name;
+                    if (name == t && tracks[at]?.extra_id == item.id){
+                        let track = duplicate(tracks[at]);
+                        track.name = name;
+                        delete track.extra_id;
+                        delete track.original_name;
+                        trackUpdates[name] = track;
+                    }
+                }
+            }
+            let stuntUpdates = duplicate(item.system.stunts);
+            let stunts = item?.parent?.system?.stunts;
+            for (let s in stuntUpdates){
+                for (let as in stunts){
+                    let name = stunts[as]?.original_name;
+                    if (name == s && stunts[as]?.extra_id == item.id){
+                        let stunt = duplicate(stunts[as]);
+                        stunt.name = name;
+                        delete stunt.extra_id;
+                        delete stunt.original_name;
+                        stuntUpdates[name] = stunt;
+                    }
+                }
+            }
+            // If we await this next update it causes an issue with the data below not being populated if the track is being
+            // dragged from an actor.
+            item.update({"system.tracks":trackUpdates, "system.stunts":stuntUpdates},{renderSheet:false});
+        }
         let data = {
             "type":"Item", 
             "uuid":item.uuid
@@ -1116,7 +1170,7 @@ export class fcoCharacter extends ActorSheet {
                     setTimeout(async () => {
                         await super._render(...args);
                         this.renderPending = false;
-                    }, 150);
+                    }, 50);
             }
         } else this.renderBanked = true;
     }
@@ -1384,6 +1438,11 @@ export class fcoCharacter extends ActorSheet {
             // Refresh spent + refresh should = the game's refresh.
             let checkSpent = sheetData.system.details.fatePoints.refresh + sheetData.refreshSpent;
             let worldRefresh = game.settings.get("fate-core-official", "refreshTotal");
+            
+            if (sheetData.system?.override?.active){
+                if (sheetData.system?.override?.refresh) worldRefresh = sheetData.system?.override?.refresh
+            }
+            
             let checkWorld = worldRefresh - sheetData.system.details.fatePoints.refresh;
 
             let message = game.i18n.localize("fate-core-official.SheetDoesNotAddUp")
@@ -1433,7 +1492,8 @@ export class fcoCharacter extends ActorSheet {
         sheetData.skillTotal = skillTotal;
         let skills_label = game.settings.get("fate-core-official", "skillsLabel");
         sheetData.skillsLabel = skills_label || game.i18n.localize("fate-core-official.defaultSkillsLabel");
-        sheetData.ladder = fcoConstants.getFateLadder();
+        let fcoc = new fcoConstants();
+        sheetData.ladder = fcoc.getFateLadder();
         sheetData.sortByRank = this.sortByRank;
         sheetData.gameSkillPoints = game.settings.get("fate-core-official", "skillTotal")
         sheetData.GM = game.user.isGM;
@@ -1484,6 +1544,8 @@ Hooks.on ('dropActorSheetData', async (actor, sheet, data) => {
         //First check it's not from the same sheet
         if (data.ident !== "mf_draggable") return;
         if (actor.id == data.origin) return;
+        delete data.dragged?.extra_id;
+        delete data.dragged?.original_name;
         if (data.type == "stunt"){
             let old = actor.system.stunts[data.dragged.name];
             if (old) {

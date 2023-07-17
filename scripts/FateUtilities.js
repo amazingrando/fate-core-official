@@ -733,7 +733,7 @@ class FateUtilities extends Application{
     async tokenNameChange(event, html){
         let t_id = event.target.id.split("_")[0];
         let token = game.scenes.viewed.getEmbeddedDocument("Token", t_id);
-        if (token != undefined){
+        if (token != undefined && token.actor.isOwner){
             let name = await fcoConstants.updateShortText(game.i18n.localize("fate-core-official.whatShouldTokenNameBe"),token.name);
             await token.update({"name":name});
         }
@@ -771,7 +771,8 @@ class FateUtilities extends Application{
             rank = token.actor.system.skills[skill].rank;
         }
 
-        let ladder = fcoConstants.getFateLadder();
+        let fcoc = new fcoConstants();
+        let ladder = fcoc.getFateLadder();
         let rankS = rank.toString();
         let rung = ladder[rankS];
 
@@ -1519,8 +1520,8 @@ class FateUtilities extends Application{
                                     speaker: msg
                                 });
                             }
-                            },
-                        }
+                            }
+                        }, default:"ok"
                 },
                 {
                     width:width,
@@ -1811,7 +1812,12 @@ class FateUtilities extends Application{
                 if (!actor.isToken){  
                     updates.push({"_id":actor.id, "system.tracks":tracks});
                 } else {
-                    tokenUpdates.push({"_id":tokens[i].id, "actorData.system.tracks":tracks});
+                    if (isNewerVersion(game.version, "11.293")){
+                        tokenUpdates.push({"_id":tokens[i].id, "delta.system.tracks":tracks});
+                    }
+                    else {
+                        tokenUpdates.push({"_id":tokens[i].id, "actorData.system.tracks":tracks});
+                    }
                 }    
             }
         } 
@@ -2024,6 +2030,9 @@ class FateUtilities extends Application{
             let combatants = game.combat.combatants;
             let combatant = combatants.find(comb => comb.token.id == id);
             await combatant.setFlag("fate-core-official","hasActed", true);
+            await game.socket.emit("system.fate-core-official",{"yourTurn":true, "tokenId":id});
+            // Set combat tracker turn to index of current actor
+            game.combat.update({turn:game.combat.turns.indexOf(combatant)});
         }
 
         if (type === "unact"){
@@ -2064,9 +2073,13 @@ class FateUtilities extends Application{
             let combatant = game.combat.getCombatantByToken(t_id);
             let token = combatant.token;
             const sheet = token.actor.sheet;
-            sheet.render(true, {token: token});
-            sheet.maximize();
-            sheet.toFront();
+
+            if (sheet.rendered){
+                sheet.maximize();
+                sheet.bringToTop();
+            } else {
+                sheet.render(true);
+            }
         }
     }
 
@@ -2087,7 +2100,8 @@ class FateUtilities extends Application{
             updates.push({"_id":comb.id, "flags.fate-core-official.hasActed":false})
         }
         await game.combat.updateEmbeddedDocuments("Combatant", updates);
-        game.combat.nextRound();
+        if (game.combat.round == 0) game.combat._playCombatSound("startEncounter")
+        game.combat.update({turn:null, round:game.combat.round+1});
     }
 
     //Set up the default options for instances of this class
@@ -2130,6 +2144,7 @@ async getData(){
     } else {
         data.conflict = true;
         data.conflictName = game.combat.getFlag("fate-core-official","name");
+        data.conflictExchange = game.combat.round;
         if (!data.conflictName) {
             let conflictNum = game.combats.combats.indexOf(game.combat)+1;
             data.conflictName = game.i18n.localize("fate-core-official.word_for_conflict") + " "+conflictNum;
@@ -2367,7 +2382,7 @@ async _render(...args){
                 await setTimeout(async () => {
                     await super._render(...args);
                     this.renderPending = false;
-                }, 150);
+                }, 50);
         }
     } else this.renderBanked = true;
 }
@@ -2417,7 +2432,7 @@ async renderMe(...args){
           this._render(false);
           this.delayedRender = false;
           this.renderPending = false;
-        }, 150);
+        }, 50);
       } 
     }
 }
@@ -2426,6 +2441,28 @@ Hooks.on('ready', function()
 {
     if (!canvas.ready && game.settings.get("core", "noCanvas")) {
         let fu = new FateUtilities().render(true);
+    }
+
+    // Override the Foundry combat sound process to account for popcorn initiative, if we're using that.
+    let init_skill = game.settings.get("fate-core-official","init_skill");
+    if (init_skill == "None") {
+        Combat.prototype._playCombatSound = function (announcement) {
+            if (announcement == "nextUp") return;
+            if (announcement == "yourTurn") return;
+            if (announcement == "yourAction") announcement = "yourTurn";
+
+            if ( !CONST.COMBAT_ANNOUNCEMENTS.includes(announcement) ) {
+                throw new Error(`"${announcement}" is not a valid Combat announcement type`);
+              }
+              const theme = CONFIG.Combat.sounds[game.settings.get("core", "combatTheme")];
+              console.log(theme);
+              if ( !theme || theme === "none" ) return;
+              const sounds = theme[announcement];
+              if ( !sounds ) return;
+              const src = sounds[Math.floor(Math.random() * sounds.length)];
+              const volume = game.settings.get("core", "globalInterfaceVolume");
+              game.audio.play(src, {volume});
+        }
     }
 })
 
@@ -2797,6 +2834,13 @@ Hooks.once('ready', async function () {
         }
     })
 
+    game.socket.on("system.fate-core-official", yourTurn => {
+        if (yourTurn.yourTurn) {
+            let combatant = game.combat.combatants.find(comb => comb.token.id == yourTurn.tokenId);
+            if (combatant && !game.user.isGM && combatant.isOwner) game.combat._playCombatSound("yourAction");
+        }
+    })
+
     game.socket.on("system.fate-core-official", onTop => {
         if (onTop?.drawingsOnTop == true && game.canvas.ready){
             canvas.drawings.foreground = canvas.drawings.addChildAt(new PIXI.Container(), 0);
@@ -2837,7 +2881,7 @@ async function updateRolls (rolls) {
     }
 }
 
-Hooks.on('renderFateUtilities', function(){
+Hooks.on('renderFateUtilities', async function(){
     let numAspects = document.getElementsByName("sit_aspect").length;
     if (numAspects == undefined){
         numAspects = 0;
@@ -2848,8 +2892,10 @@ Hooks.on('renderFateUtilities', function(){
     
     if (numAspects > game.system.sit_aspects){
         let pane = document.getElementById("fu_aspects_pane");
-        pane.scrollTop=pane.scrollHeight;
-        game.system.sit_aspects = numAspects;
+        await setTimeout(async () => {
+            pane.scrollTop=pane.scrollHeight;
+            game.system.sit_aspects = numAspects;
+        }, 50);
     }
     
     if (numAspects < game.system.sit_aspects){
@@ -2866,8 +2912,10 @@ Hooks.on('renderFateUtilities', function(){
     
     if (numRolls > game.system.num_rolls){
         let pane = document.getElementById("fu_rolls_tab")
-        pane.scrollTop=pane.scrollHeight;
-        game.system.num_rolls = numRolls;
+        await setTimeout(async () => {
+            pane.scrollTop=pane.scrollHeight;
+            game.system.num_rolls = numRolls;
+        }, 50);
     }
     
     if (numRolls < game.system.num_rolls){

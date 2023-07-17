@@ -69,7 +69,7 @@ export class Thing extends ActorSheet {
             // Create the container item if it does not already exist
             let container = new Item({name: this.actor.name, "description": this.actor.description, "type": "Extra"});
 
-            if ( foundry.utils.isObjectEmpty(this.actor.system.container.extra) ) {
+            if ( foundry.utils.isEmpty(this.actor.system.container.extra) ) {
                 await this.actor.update({"system.container.extra": container.toObject()});
               } else container = duplicate(this.actor.system.container.extra);
 
@@ -308,7 +308,7 @@ export class Thing extends ActorSheet {
                     setTimeout(async () => {
                         await super._render(...args);
                         this.renderPending = false;
-                    }, 150);
+                    }, 50);
             }
         } else this.renderBanked = true;
     }
@@ -392,7 +392,7 @@ async function checkContainer (actor){
                 }
             }
             actor.updatePending = false;
-        }, 150);
+        }, 50);
     }
 }
 
@@ -464,20 +464,20 @@ async function createThing (canvas_scene, data, user_id, shiftDown, x, y, actord
         hidden: false,
         actorId: itemActor.id,
         actorLink: true,
-        actorData: {}
+        //actorData: {}
       }
 
     let scene = game.scenes.get(canvas_scene._id);
     await scene.createEmbeddedDocuments("Token", [token]); //createEmbeddedDocuments takes an array of creation data.
     //Now we need to create the contents and set the container parameters.
     if (contents?.extras != undefined){
+        await itemActor.createEmbeddedDocuments("Item", contents.extras);
         await itemActor.update({
             "system.container.locked":contents.locked,
             "system.container.security":contents.security,
             "system.container.movable":true,
             "system.img":newItem.img,
         })
-        await itemActor.createEmbeddedDocuments("Item", contents.extras);
     }
 }
 

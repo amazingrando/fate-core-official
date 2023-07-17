@@ -1,3 +1,65 @@
+# 4.4.42
+* Found a way to make the Popcorn tracker play better with the Foundry standard initiative system, so that now Foundry and FCO agree on whose turn it is. This enables modules like Maestro to correctly cue off of changes of turn to play hype tracks etc.
+
+# 4.4.41
+* Added code to integrate the chosen combat sound board into the Fate Utilities popcorn initiative tracker. It works a bit differently from the core version (as 'your turn is coming up' is meaningless for Popcorn initiative) and just plays the 'Your turn' sound for players, not GMs.
+
+# 4.4.40
+* Fixed a bug in the schema for fcoAspect which incorrectly did not allow it to have a value upon creation.
+
+# 4.4.39
+Fixed a bug in the new feature from 4.4.38. Was breaking on character names with apostrophes in them due to the identifier used to find the relevant data items.
+
+# 4.4.38
+* Forced a refresh after a bunch of settings that had relied upon this being done after the settings were changed. Without this, it was impossible to, say, set a skill as the initiative skill until after a reload following installation of skill default settings.
+* Added settings that allows a character to be set to override the refresh total and skill total of the game, using their own total instead.
+
+# 4.4.37
+* Updated the code to avoid the deprecated actorData attribute on token actors; this is exchanged with the delta attribute
+* Hid the 'synchronise token name to character name' button unless the user owns the viewed character.
+
+# 4.4.36
+* Updated the order of operations in CreateThing so that objects can be created in an object that was locked in a character's inventory.
+* Added an unobtrusive sync button next to the actor name. This will cause the current actor's name to be applied to the prototype token name attribute (for a real actor) or te token name attribute (for a token character).
+
+# 4.4.35
+* Made some changes to the way metadata is displayed in Fate Utilities - players now can't see the eye icon if a character is visible to them but not visible to everyone by default; this was always intended to be GM information. 
+* Only owners of tokens can now double click the name in Fate Utilities to change it. (Before, they could double click and the dialog would pop up but they would be unable to make the changes due to lack of permissions)
+
+# 4.4.34
+* Ad-hoc roll dialog now performs the roll if enter is pressed.
+
+# 4.4.33
+* Deployed a fix for the behaviour that was broken by this Foundry bug fix:
+  https://github.com/foundryvtt/foundryvtt/issues/6978
+  The hook check for the modifier keybinding now checks for event.isTrusted on the keyUp event and ignores it if isTrusted is false (as this was emulated by Foundry rather than triggered by the user letting go of the shift key).
+
+# 4.4.31 and 4.4.32
+  * Changed the fcoConstants.getFateLadder method to be a non-static method, allowing it to be overridden with fcoConstants.prototype.getFateLadder = function () { return {"10":"", "9":"", "8":"Fantastic"}} and so on.
+
+# 4.4.30
+  * Changed ad-hoc track editor to prevent the creation of a track in the not-real 'All' category.
+  * Added a function to make it possible to change the categoy applied to any or all tracks in the ManageTracks utility.
+  * Added a function to change the category of a track on an entity with the Entity Track Editor.
+
+# 4.4.29
+  * Made a small change to the logic handling drag and drop of extras between characters. Any tracks and stunts with boxes will now have their aspect names and boxes copied on transfer/copy, allowing for consistent behaviour when copying and when turning extras off and on again.
+
+# 4.4.28
+  * Fixed a major bug in the sheet for extras that was causing issues with the display and saving of the extra's information.
+
+# 4.4.27
+  * Fixed the issue that was preventing the roll tab and situation aspects pane from scrolling to the bottom of the list when a new roll/situation aspect is added to Fate Utilities.
+
+# 4.4.26
+  * The user configuration menu will now not offer Things as characters which can be bound to players.
+
+# 4.4.25
+ * Fixed a bug that could result in dragged stunts, tracks, etc. ending up in a bad state due to not deleting extra_id and original_name on copying.
+
+# 4.4.24
+ * Applied the bug fix for clicking on the character's avatar in FateUtilities from release 4.4.23 to the avatar of each character in the FU combat tracker as well as the main avatar on the aspects tab.
+
 # 4.4.23
   * Fixed a bug where tabbing out of the player fate point field in FateUtilities would not update their fate points.
   * Fixed a bug where clicking on the avatar of a character in FateUtilities when that character sheet was already rendered would put the character sheet in a dirty state that meant it wouldn't be updated when changes were made and couldn't be closed.

@@ -42,6 +42,8 @@
 * To create a field with a random ID in it: new foundry.data.fields.StringField({initial: () => foundry.utils.randomID()})
 */
 
+/* To make a stringfield searchable, add the property textSearch: true */
+
 class fcoSkill extends foundry.abstract.DataModel {
     static defineSchema(){
         return {
@@ -65,6 +67,7 @@ class fcoAspect extends foundry.abstract.DataModel {
     static defineSchema(){
         return {
             "name":new foundry.data.fields.StringField({ nullable: false, required: true, initial:""}),
+            "value":new foundry.data.fields.StringField({ nullable: false, required: true, initial:""}),
             "description":new foundry.data.fields.StringField({ nullable: false, required: true, initial:""}),
             "notes":new foundry.data.fields.StringField({ nullable: false, required: true, initial:""}),
             "extra_id": new foundry.data.fields.StringField({ required: false, initial:undefined }),

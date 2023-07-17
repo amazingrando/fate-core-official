@@ -425,7 +425,14 @@ Hooks.once('ready', async function () {
 
 // Needed to update with token name changes in FU.
 Hooks.on('updateToken', (token, data, userId) => {
-    if (data.hidden != undefined || data.actorData != undefined || data.flags != undefined || data.name!=undefined){
+    let check = false;
+    if (isNewerVersion(game.version, "11.293")){
+        if (data.hidden != undefined || data.delta != undefined || data.flags != undefined || data.name!=undefined) check = true;
+    }
+    else {
+        if (data.hidden != undefined || data.actorData != undefined || data.flags != undefined || data.name!=undefined) check = true;
+    }
+    if (check){
         game.system.apps["actor"].forEach(a=> {
             a.renderMe(token.id, data, token);
         })
@@ -513,6 +520,17 @@ Hooks.on('getSceneControlButtons', function(hudButtons)
             }
 })
 
+// This next hook is required to prevent Things from showing up in the player configuration menu. 
+Hooks.on('renderUserConfig', (user, html, data) => {
+    let actors = html.find("li");
+    for (let actor of actors){
+        let id = actor.getAttribute("data-actor-id");
+        if (game.actors.get(id).type == "Thing"){
+            actor.remove();
+        }
+    }
+})
+
 Hooks.once('init', async function () {
     CONFIG.Actor.documentClass = fcoActor;
     CONFIG.Item.documentClass = fcoExtra;
@@ -576,8 +594,8 @@ Hooks.once('init', async function () {
         game.keybindings.register("fate-core-official", "fcoInteractionModifier", {
             name: "Fate Core Official modifier key for dragging and clicking",
             editable: bindings,
-            onDown: () => { game.system["fco-shifted"] = true; },
-            onUp: () => { game.system["fco-shifted"] = false; }
+            onDown: (...args) => { game.system["fco-shifted"] = true;},
+            onUp: (...args) => { if (args[0].event.isTrusted == true) {game.system["fco-shifted"] = false;}}
           })
     }
     
@@ -673,6 +691,7 @@ Hooks.once('init', async function () {
         config: true,        // This specifies that the setting appears in the configuration view
         type: String,
         restricted:true,
+        requiresReload: true,
         choices: {           // If choices are defined, the resulting setting will be a select menu
             "nothing":game.i18n.localize("fate-core-official.No"),
             "fateCore":game.i18n.localize("fate-core-official.YesFateCore"),
@@ -728,6 +747,7 @@ Hooks.once('init', async function () {
             config: true,        // This specifies that the setting appears in the configuration view
             type: String,
             restricted:true,
+            requiresReload: true,
             choices: {           // If choices are defined, the resulting setting will be a select menu
                 "nothing":game.i18n.localize("No"),
                 "fateCore":game.i18n.localize("fate-core-official.YesFateCore"),
@@ -779,6 +799,7 @@ Hooks.once('init', async function () {
         config: true,        // This specifies that the setting appears in the configuration view
         type: String,
         restricted:true,
+        requiresReload: true,
         choices: {           // If choices are defined, the resulting setting will be a select menu
             "nothing":game.i18n.localize("fate-core-official.No"),
             "fateCore":game.i18n.localize("fate-core-official.YesFateCore"),
@@ -862,6 +883,7 @@ Hooks.once('init', async function () {
                 let text = await fcoConstants.getSettings();
                 fcoConstants.importSettings(text);
                 game.settings.set("fate-core-official","importSettings",false);
+                foundry.utils.debouncedReload();
             }
         }
     })
@@ -987,7 +1009,10 @@ game.settings.register("fate-core-official","freeStunts", {
         "restricted":true,
         type:String,
         default:"None",
-        choices:skill_choices
+        choices:skill_choices,
+        onChange: () => {
+            foundry.utils.debouncedReload();
+        }
     })
 
     game.settings.register("fate-core-official","modifiedRollDefault", {
@@ -1545,7 +1570,7 @@ Handlebars.registerHelper("hasBoxes", function(track) {
 
 Handlebars.registerHelper("fco_item_name_from_id", function (actor, id){
     let item = actor.items.get(id);
-    return item.name;
+    return item?.name;
 })
 
 class CustomiseSheet extends FormApplication {
